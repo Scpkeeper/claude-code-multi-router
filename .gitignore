@@ -1,0 +1,25 @@
+# —— 密钥：绝不允许进仓库 ——
+.env
+.env.*
+!.env.example
+*.key
+.key
+config.json
+!config/config.example.json
+**/.claude-code-router/config.json
+
+# 日志与运行时产物
+logs/
+*.log
+npm-debug.log*
+
+# Node
+node_modules/
+package-lock.json
+yarn.lock
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

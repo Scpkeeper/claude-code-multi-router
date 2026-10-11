@@ -1,0 +1,15 @@
+{
+  "name": "claude-code-multi-router",
+  "version": "1.0.0",
+  "description": "按 6 类工程职责把 Claude Code 自动路由到 OpenRouter 上的 4 个模型",
+  "private": true,
+  "license": "MIT",
+  "author": "SWP(SHUAI)",
+  "scripts": {
+    "test": "node tests/test-custom-router.js",
+    "install:router": "node scripts/install.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
