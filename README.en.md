@@ -118,6 +118,45 @@ Real OpenRouter calls (2026-10-11); the `model` field in the response is what up
 `model` field, which verified "key injection + routing + protocol translation" in one pass without a real
 key — a handy trick for debugging gateways.
 
+## Cost comparison: three orchestration styles (why brief beats real-time switching)
+
+A trap hit while building this: **the first instinct was "switch models per message in real time", but that
+turned out more expensive.** The reason is context. In a single shared conversation the context accumulates,
+and every turn re-sends the whole history to whatever model is current. The moment you pull an expensive model
+(Opus / Sonnet) in, it **re-reads the entire bloated history** (including cheap-model chatter), so you pay the
+premium rate, over and over, for tokens a cheap model could have handled.
+
+The cheaper shape is a **brief three-step**:
+
+1. One expensive model does **planning** and emits a brief;
+2. Cheap models **implement from the brief** (each subtask carries only the brief, not the whole thread);
+3. An expensive model comes back **only at the end to fix bugs** (sees just the brief + diff + errors).
+
+Below, one medium "feature build" (1 plan + 8 implementation [4 front-end / 4 back-end] + 2 bug-fix + 2 hard
+reasoning + 1 wrap-up = 14 turns). Prices are OpenRouter **2026-10-14 snapshot**:
+
+| Model | Input $/1M | Output $/1M |
+|---|---|---|
+| anthropic/claude-opus-5.5 | 4.00 | 20.00 |
+| anthropic/claude-sonnet-5.5 | 2.00 | 10.00 |
+| moonshotai/kimi-k3 | 0.73 | 13.50 |
+| deepseek/deepseek-v4-flash | 0.09 | 0.18 |
+
+| Style | Idea | Expensive ctx read | Est. total | Note |
+|---|---|---|---|---|
+| **① Real-time switching** (single accumulating thread) | pick a model per message; expensive models pulled into hard turns, re-reading full history each time | **126.0K** | **$0.750** | expensive models repeatedly pay premium for context cheap models could handle |
+| **② Brief three-step** ✅ | Opus writes a brief once; cheap models implement from it (scoped); Sonnet only fixes bugs at the end (focused) | **27.0K** | **$0.289** | expensive models touch only small, focused context — cheapest |
+| **③ All Opus** | every turn goes to Opus, reading full context each time | **214.0K** | **$1.486** | highest unit price and the expensive model does everything — highest absolute cost |
+
+**Result**: for the same 14-turn workload, brief saves **61%** over real-time switching and **81%** over
+all-Opus. Almost the entire difference is the single line "how much context the expensive models read" —
+real-time switching's trap is exactly that it spreads context to expensive models to re-read.
+
+> Numbers are reproducible: `node scripts/cost-model.js` (edit `PRICE` to track live OpenRouter pricing,
+> edit the workload assumptions to fit your own project). Note: this repo's keyword router decides *which*
+> model a single request goes to; the comparison above is about *how you structure the calls* — the keyword
+> router supports all three styles, and brief is the cheapest way to use it.
+
 ## Layout
 
 ```
@@ -128,6 +167,7 @@ scripts/
   install.js            cross-platform installer (pin version / write config / run tests)
   install.cmd / .sh     platform wrappers
   start-router.cmd      launcher with a key check
+  cost-model.js         cost estimate for the three orchestration styles (reproducible)
 tests/
   test-custom-router.js 18 routing cases
 docs/
